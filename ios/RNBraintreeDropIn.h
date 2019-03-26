@@ -33,4 +33,6 @@
 
 + (void)resolvePayment:(BTDropInResult* _Nullable)result deviceData:(NSString * _Nonnull)deviceDataCollector resolver:(RCTPromiseResolveBlock _Nonnull)resolve;
 
++ (NSMutableArray*)findSupportedNewworksForApplePay;
+
 @end
