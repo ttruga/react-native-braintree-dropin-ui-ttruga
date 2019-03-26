@@ -43,21 +43,26 @@ RCT_REMAP_METHOD(show,
     
 
     if([options[@"applePay"] boolValue]){
-        self.braintreeClient = [[BTAPIClient alloc] initWithAuthorization:clientToken];
-
-        self.paymentRequest = [[PKPaymentRequest alloc] init];
-        self.paymentRequest.merchantIdentifier = options[@"merchantIdentifier"];
-        self.paymentRequest.merchantCapabilities = PKMerchantCapability3DS;
-        self.paymentRequest.countryCode = options[@"countryCode"];
-        self.paymentRequest.currencyCode = options[@"currencyCode"];
-        self.paymentRequest.supportedNetworks = @[PKPaymentNetworkAmex, PKPaymentNetworkVisa, PKPaymentNetworkMasterCard, PKPaymentNetworkDiscover, PKPaymentNetworkChinaUnionPay];
-        self.paymentRequest.paymentSummaryItems =
+        NSMutableArray *supportedNetworks = [[self class] findSupportedNewworksForApplePay];
+        if([PKPaymentAuthorizationViewController class]
+           && [PKPaymentAuthorizationViewController canMakePayments]
+           && [PKPaymentAuthorizationViewController canMakePaymentsUsingNetworks:supportedNetworks]){
+            
+            self.braintreeClient = [[BTAPIClient alloc] initWithAuthorization:clientToken];
+            
+            self.paymentRequest = [[PKPaymentRequest alloc] init];
+            self.paymentRequest.merchantIdentifier = options[@"merchantIdentifier"];
+            self.paymentRequest.merchantCapabilities = PKMerchantCapability3DS;
+            self.paymentRequest.countryCode = options[@"countryCode"];
+            self.paymentRequest.currencyCode = options[@"currencyCode"];
+            self.paymentRequest.supportedNetworks = supportedNetworks;
+            self.paymentRequest.paymentSummaryItems =
             @[
-                [PKPaymentSummaryItem summaryItemWithLabel:options[@"merchantName"] amount:[NSDecimalNumber decimalNumberWithString:options[@"orderTotal"]]]
-            ];
-
-        self.viewController = [[PKPaymentAuthorizationViewController alloc] initWithPaymentRequest: self.paymentRequest];
-        self.viewController.delegate = self;
+              [PKPaymentSummaryItem summaryItemWithLabel:options[@"merchantName"] amount:[NSDecimalNumber decimalNumberWithString:options[@"orderTotal"]]]
+              ];
+        }else{
+            request.applePayDisabled = YES;
+        }
     }else{
         request.applePayDisabled = YES;
     }
@@ -79,14 +84,20 @@ RCT_REMAP_METHOD(show,
                         reject(@"3DSECURE_NOT_ABLE_TO_SHIFT_LIABILITY", @"3D Secure liability cannot be shifted", nil);
                     } else if (!cardNonce.threeDSecureInfo.liabilityShifted && cardNonce.threeDSecureInfo.wasVerified) {
                         reject(@"3DSECURE_LIABILITY_NOT_SHIFTED", @"3D Secure liability was not shifted", nil);
-                    } else if(result.paymentMethod == nil && result.paymentOptionType == 18){ //Apple Pay
+                    } else if(result.paymentMethod == nil && result.paymentOptionType == BTUIKPaymentOptionTypeApplePay){ //Apple Pay
                         UIViewController *ctrl = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+                        
+                        self.viewController = [[PKPaymentAuthorizationViewController alloc] initWithPaymentRequest: self.paymentRequest];
+                        self.viewController.delegate = self;
                         [ctrl presentViewController:self.viewController animated:YES completion:nil];
                     } else{
                         [[self class] resolvePayment:result deviceData:self.deviceDataCollector resolver:resolve];
                     }
-                } else if(result.paymentMethod == nil && result.paymentOptionType == 18){ //Apple Pay
+                } else if(result.paymentMethod == nil && result.paymentOptionType == BTUIKPaymentOptionTypeApplePay){ //Apple Pay
                     UIViewController *ctrl = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+                    
+                    self.viewController = [[PKPaymentAuthorizationViewController alloc] initWithPaymentRequest: self.paymentRequest];
+                    self.viewController.delegate = self;
                     [ctrl presentViewController:self.viewController animated:YES completion:nil];
                 } else{
                     [[self class] resolvePayment:result deviceData:self.deviceDataCollector resolver:resolve];
@@ -136,6 +147,27 @@ RCT_REMAP_METHOD(show,
 // Be sure to implement -paymentAuthorizationViewControllerDidFinish:
 - (void)paymentAuthorizationViewControllerDidFinish:(PKPaymentAuthorizationViewController *)controller{
     [self.reactRoot dismissViewControllerAnimated:YES completion:nil];
+}
+
++ (NSMutableArray*)findSupportedNewworksForApplePay{
+    NSMutableArray *sns = [NSMutableArray arrayWithCapacity:0];
+    if(@available(iOS 8.0, *)){
+        [sns addObject:PKPaymentNetworkAmex];
+        [sns addObject:PKPaymentNetworkMasterCard];
+        [sns addObject:PKPaymentNetworkVisa];
+    }
+    if(@available(iOS 9.0, *)){
+        [sns addObject:PKPaymentNetworkDiscover];
+        [sns addObject:PKPaymentNetworkPrivateLabel];
+    }
+    if(@available(iOS 9.2, *)){
+        [sns addObject:PKPaymentNetworkChinaUnionPay];
+        [sns addObject:PKPaymentNetworkInterac];
+    }
+    if(@available(iOS 10.1, *)){
+        [sns addObject:PKPaymentNetworkJCB];
+    }
+    return sns;
 }
 
 + (void)resolvePayment:(BTDropInResult* _Nullable)result deviceData:(NSString * _Nonnull)deviceDataCollector resolver:(RCTPromiseResolveBlock _Nonnull)resolve {
