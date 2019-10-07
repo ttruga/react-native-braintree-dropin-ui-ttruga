@@ -1,8 +1,9 @@
-# react-native-braintree-dropin-ui
+# react-native-braintree-dropin-ui-ttruga
 
-> React Native integration of Braintree Drop-in IOS V4 ANDROID V2 (Apple Pay &Android Pay Enabled)
+> React Native integration of Braintree Drop-in IOS V4 ANDROID V2 (Apple Pay &Android Pay Enabled), forked from other repos in order to fix the cocoapod misdirection
 
 ## Getting started
+Obsolete.. this package is not posted on NPM!
 
 ```bash
 npm install react-native-braintree-dropin-ui --save
